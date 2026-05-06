@@ -5,7 +5,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../providers/event_provider.dart';
 import '../providers/participant_provider.dart';
-import '../widgets/stat_card.dart';
 import '../widgets/capacity_indicator.dart';
 import '../utils/app_theme.dart';
 import '../utils/constants.dart';
@@ -30,7 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       vsync: this,
       duration: AppConstants.pulseDuration,
     )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+    _pulseAnimation = Tween<double>(begin: 0.97, end: 1.03).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
@@ -41,163 +40,186 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
-  void _refresh() {
-    setState(() => _lastUpdated = DateTime.now());
-  }
+  void _refresh() => setState(() => _lastUpdated = DateTime.now());
 
   @override
   Widget build(BuildContext context) {
-    final eventProvider = context.watch<EventProvider>();
-    final participantProvider = context.watch<ParticipantProvider>();
+    final ep = context.watch<EventProvider>();
+    final pp = context.watch<ParticipantProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeEvent = eventProvider.activeEvent;
 
-    final checkedIn = participantProvider.checkedInCount;
-    final total = participantProvider.totalCount;
-    final pending = participantProvider.pendingCount;
-    final maxCap = activeEvent?.maxCapacity ?? 100;
-    final remaining = maxCap - checkedIn;
+    final checkedIn = pp.checkedInCount;
+    final total = pp.totalCount;
+    final pending = pp.pendingCount;
+    final maxCap = ep.activeEvent?.maxCapacity ?? 100;
+    final remaining = (maxCap - checkedIn).clamp(0, maxCap);
+    final pct = maxCap > 0 ? (checkedIn / maxCap) : 0.0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppConstants.pagePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status Banner
-          _buildStatusBanner(eventProvider, isDark),
-          const SizedBox(height: 24),
+          // ── Status Banner ──────────────────────────────────────
+          _buildStatusBanner(ep, isDark),
+          const SizedBox(height: 16),
 
-          // Refresh Info
+          // ── Timestamp + Refresh ────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Last updated: ${DateFormat('h:mm:ss a').format(_lastUpdated)}',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: isDark ? Colors.white38 : const Color(0xFFA0AEC0),
-                ),
+              Row(
+                children: [
+                  Icon(Icons.access_time_rounded,
+                      size: 14,
+                      color: isDark
+                          ? Colors.white38
+                          : const Color(0xFFA0AEC0)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Updated ${DateFormat('h:mm:ss a').format(_lastUpdated)}',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: isDark
+                          ? Colors.white38
+                          : const Color(0xFFA0AEC0),
+                    ),
+                  ),
+                ],
               ),
-              IconButton.filled(
-                onPressed: _refresh,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppTheme.secondary.withOpacity(0.15),
-                  foregroundColor: AppTheme.secondary,
+              GestureDetector(
+                onTap: _refresh,
+                child: Container(
                   padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.refresh_rounded,
+                      size: 18, color: AppTheme.secondary),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          // Stat Cards
-          GridView.count(
-            crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.4,
+          // ── Stat Tiles ─────────────────────────────────────────
+          Row(
             children: [
-              StatCard(
-                label: 'Total Registered',
-                value: total,
-                icon: Icons.group_rounded,
-                color: AppTheme.secondary,
+              Expanded(
+                child: _StatTile(
+                  label: 'Total',
+                  value: total,
+                  icon: Icons.group_rounded,
+                  color: AppTheme.secondary,
+                  isDark: isDark,
+                ),
               ),
-              StatCard(
-                label: 'Checked In',
-                value: checkedIn,
-                icon: Icons.check_circle_rounded,
-                color: AppTheme.success,
-                subtitle: activeEvent != null
-                    ? '${(checkedIn / maxCap * 100).toInt()}%'
-                    : null,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatTile(
+                  label: 'Checked In',
+                  value: checkedIn,
+                  icon: Icons.check_circle_rounded,
+                  color: AppTheme.success,
+                  isDark: isDark,
+                  badge:
+                      '${(pct * 100).toInt()}%',
+                ),
               ),
-              StatCard(
-                label: 'Remaining Capacity',
-                value: remaining.clamp(0, maxCap),
-                icon: Icons.chair_rounded,
-                color: AppTheme.warning,
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                  label: 'Pending',
+                  value: pending,
+                  icon: Icons.pending_rounded,
+                  color: const Color(0xFF8338EC),
+                  isDark: isDark,
+                ),
               ),
-              StatCard(
-                label: 'Pending Check-in',
-                value: pending,
-                icon: Icons.pending_rounded,
-                color: const Color(0xFF8338EC),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatTile(
+                  label: 'Remaining',
+                  value: remaining,
+                  icon: Icons.chair_rounded,
+                  color: AppTheme.warning,
+                  isDark: isDark,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 24),
 
-          // Capacity Bar
+          // ── Capacity Section ───────────────────────────────────
           _buildCapacitySection(checkedIn, maxCap, isDark),
           const SizedBox(height: 24),
 
-          // Chart
-          _buildChartSection(participantProvider, isDark),
+          // ── Bar Chart ─────────────────────────────────────────
+          _buildChartSection(pp, isDark),
           const SizedBox(height: 24),
 
-          // Recent Activity Feed
-          _buildActivityFeed(participantProvider, isDark),
+          // ── Activity Feed ─────────────────────────────────────
+          _buildActivityFeed(pp, isDark),
           const SizedBox(height: 24),
         ],
       ),
     );
   }
 
+  // ─── Status Banner ──────────────────────────────────────────────────────────
   Widget _buildStatusBanner(EventProvider ep, bool isDark) {
     final status = ep.crowdStatus;
     final pct = ep.capacityPercentage;
 
-    Color bannerColor;
-    String bannerText;
-    IconData bannerIcon;
+    Color color;
+    String text;
+    IconData icon;
+    String emoji;
 
     switch (status) {
       case 'critical':
-        bannerColor = AppTheme.error;
-        bannerText = '🔴 FULL / CRITICAL';
-        bannerIcon = Icons.warning_rounded;
+        color = AppTheme.error;
+        text = 'CRITICAL';
+        emoji = '🔴';
+        icon = Icons.warning_amber_rounded;
         break;
       case 'moderate':
-        bannerColor = AppTheme.warning;
-        bannerText = '⚠ MODERATE';
-        bannerIcon = Icons.info_rounded;
+        color = AppTheme.warning;
+        text = 'MODERATE';
+        emoji = '⚠️';
+        icon = Icons.info_outline_rounded;
         break;
       default:
-        bannerColor = AppTheme.success;
-        bannerText = '✅ SAFE';
-        bannerIcon = Icons.check_circle_rounded;
+        color = AppTheme.success;
+        text = 'SAFE';
+        emoji = '✅';
+        icon = Icons.check_circle_outline_rounded;
     }
 
     return AnimatedBuilder(
       animation: _pulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _pulseAnimation.value,
-          child: child,
-        );
-      },
+      builder: (context, child) =>
+          Transform.scale(scale: _pulseAnimation.value, child: child),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              bannerColor.withOpacity(0.85),
-              bannerColor,
-            ],
+            colors: [color, color.withOpacity(0.75)],
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: bannerColor.withOpacity(0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              color: color.withOpacity(0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -209,9 +231,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                 color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: Icon(bannerIcon, color: Colors.white, size: 28),
+              child: Icon(icon, color: Colors.white, size: 26),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,16 +241,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                   Text(
                     'Crowd Status',
                     style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 12,
                       color: Colors.white70,
+                      letterSpacing: 0.5,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    bannerText,
+                    '$emoji  $text',
                     style: GoogleFonts.poppins(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
+                      height: 1.2,
                     ),
                   ),
                 ],
@@ -240,7 +265,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 Text(
                   '${(pct * 100).toInt()}%',
                   style: GoogleFonts.poppins(
-                    fontSize: 36,
+                    fontSize: 34,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                     height: 1,
@@ -249,7 +274,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 Text(
                   'capacity used',
                   style: GoogleFonts.inter(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: Colors.white70,
                   ),
                 ),
@@ -261,38 +286,31 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  // ─── Capacity Section ────────────────────────────────────────────────────────
   Widget _buildCapacitySection(int checkedIn, int maxCap, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return _Card(
+      isDark: isDark,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Venue Capacity',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : AppTheme.primary,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.stadium_rounded,
+                  color: AppTheme.secondary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Venue Capacity',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : AppTheme.primary,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          CapacityIndicator(
-            current: checkedIn,
-            max: maxCap,
-            height: 20,
-          ),
-          const SizedBox(height: 16),
+          CapacityIndicator(current: checkedIn, max: maxCap, height: 18),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -306,87 +324,96 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  // ─── Chart Section ───────────────────────────────────────────────────────────
   Widget _buildChartSection(ParticipantProvider pp, bool isDark) {
     final hourlyData = pp.checkInsByHour;
+    final maxY = hourlyData.values.isEmpty
+        ? 5.0
+        : (hourlyData.values.reduce((a, b) => a > b ? a : b) + 1).toDouble();
 
-    // Build chart data for hours 8am to 8pm
     final spots = <BarChartGroupData>[];
     for (int h = 8; h <= 20; h++) {
       final count = hourlyData[h] ?? 0;
-      spots.add(
-        BarChartGroupData(
-          x: h,
-          barRods: [
-            BarChartRodData(
-              toY: count.toDouble(),
-              gradient: LinearGradient(
-                colors: [AppTheme.secondary, AppTheme.accent],
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-              ),
-              width: 14,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+      spots.add(BarChartGroupData(
+        x: h,
+        barRods: [
+          BarChartRodData(
+            toY: count.toDouble(),
+            gradient: LinearGradient(
+              colors: [AppTheme.secondary, AppTheme.accent],
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
             ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            width: 12,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(5)),
           ),
         ],
-      ),
+      ));
+    }
+
+    final hasData = spots.any((s) => s.barRods.first.toY > 0);
+
+    return _Card(
+      isDark: isDark,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Check-in Activity Timeline',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : AppTheme.primary,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.bar_chart_rounded,
+                  color: AppTheme.secondary, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Check-in Activity Timeline',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : AppTheme.primary,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
-            'Check-ins per hour (8 AM – 8 PM)',
+            'Check-ins per hour  (8 AM – 8 PM)',
             style: GoogleFonts.inter(
-              fontSize: 12,
+              fontSize: 11,
               color: isDark ? Colors.white38 : const Color(0xFFA0AEC0),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           SizedBox(
             height: 180,
-            child: spots.isEmpty || spots.every((s) => s.barRods.first.toY == 0)
+            child: !hasData
                 ? Center(
-                    child: Text(
-                      'No check-in data yet',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: isDark
-                            ? Colors.white38
-                            : const Color(0xFFA0AEC0),
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.bar_chart_rounded,
+                            size: 40,
+                            color: isDark
+                                ? Colors.white12
+                                : const Color(0xFFE2E8F0)),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No check-in data yet',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: isDark
+                                ? Colors.white38
+                                : const Color(0xFFA0AEC0),
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : BarChart(
                     BarChartData(
                       alignment: BarChartAlignment.spaceAround,
-                      maxY: (hourlyData.values.isEmpty
-                              ? 5
-                              : hourlyData.values.reduce((a, b) => a > b ? a : b) +
-                                  1)
-                          .toDouble(),
+                      maxY: maxY,
                       barGroups: spots,
                       borderData: FlBorderData(show: false),
                       gridData: FlGridData(
@@ -395,22 +422,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                         getDrawingHorizontalLine: (value) => FlLine(
                           color: isDark
                               ? Colors.white.withOpacity(0.05)
-                              : const Color(0xFFE2E8F0),
+                              : const Color(0xFFEEF2F7),
                           strokeWidth: 1,
                         ),
                       ),
                       titlesData: FlTitlesData(
-                        show: true,
                         topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
+                            sideTitles: SideTitles(showTitles: false)),
                         rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
+                            sideTitles: SideTitles(showTitles: false)),
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            reservedSize: 28,
+                            reservedSize: 26,
                             getTitlesWidget: (value, meta) {
                               if (value % 1 != 0) return const SizedBox();
                               return Text(
@@ -428,7 +452,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            reservedSize: 28,
+                            reservedSize: 26,
                             getTitlesWidget: (value, meta) {
                               final h = value.toInt();
                               if (h % 2 != 0) return const SizedBox();
@@ -440,7 +464,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                               return Text(
                                 label,
                                 style: GoogleFonts.inter(
-                                  fontSize: 10,
+                                  fontSize: 9,
                                   color: isDark
                                       ? Colors.white38
                                       : const Color(0xFFA0AEC0),
@@ -452,7 +476,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                       barTouchData: BarTouchData(
                         touchTooltipData: BarTouchTooltipData(
-                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          getTooltipItem: (group, _, rod, __) {
                             final h = group.x.toInt();
                             final label = h < 12
                                 ? '${h}AM'
@@ -462,10 +486,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                             return BarTooltipItem(
                               '$label\n${rod.toY.toInt()} check-ins',
                               GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white),
                             );
                           },
                         ),
@@ -478,70 +501,101 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  // ─── Activity Feed ───────────────────────────────────────────────────────────
   Widget _buildActivityFeed(ParticipantProvider pp, bool isDark) {
     final recent = pp.recentCheckIns;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Recent Activity Feed',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: isDark ? Colors.white : AppTheme.primary,
-          ),
-        ),
-        const SizedBox(height: 14),
-        if (recent.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkCard : Colors.white,
-              borderRadius: BorderRadius.circular(16),
+        Row(
+          children: [
+            const Icon(Icons.history_rounded,
+                color: AppTheme.secondary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Recent Activity',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : AppTheme.primary,
+              ),
             ),
+            const Spacer(),
+            if (recent.isNotEmpty)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${recent.length} entries',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.secondary,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (recent.isEmpty)
+          _Card(
+            isDark: isDark,
             child: Center(
-              child: Text(
-                'No check-ins recorded yet',
-                style: GoogleFonts.inter(
-                  color: isDark ? Colors.white38 : const Color(0xFFA0AEC0),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    Icon(Icons.history_toggle_off_rounded,
+                        size: 40,
+                        color:
+                            isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No check-ins yet',
+                      style: GoogleFonts.inter(
+                        color: isDark
+                            ? Colors.white38
+                            : const Color(0xFFA0AEC0),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           )
         else
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkCard : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
+          _Card(
+            isDark: isDark,
+            padding: EdgeInsets.zero,
             child: ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.all(12),
               itemCount: recent.length,
-              separatorBuilder: (_, __) => const Divider(height: 1, indent: 52),
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, indent: 52),
               itemBuilder: (context, i) {
                 final record = recent[i];
+                final initials = record.participantName
+                    .split(' ')
+                    .map((p) => p.isNotEmpty ? p[0] : '')
+                    .take(2)
+                    .join()
+                    .toUpperCase();
+                final isQR = record.method == AppConstants.methodQR;
+
                 return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 4),
                   leading: CircleAvatar(
                     backgroundColor: AppTheme.success.withOpacity(0.15),
                     child: Text(
-                      record.participantName.isNotEmpty
-                          ? record.participantName
-                              .split(' ')
-                              .map((p) => p[0])
-                              .take(2)
-                              .join()
-                              .toUpperCase()
-                          : '?',
+                      initials.isEmpty ? '?' : initials,
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
@@ -561,7 +615,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                     record.participantId,
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: isDark ? Colors.white38 : const Color(0xFFA0AEC0),
+                      color: isDark
+                          ? Colors.white38
+                          : const Color(0xFFA0AEC0),
                     ),
                   ),
                   trailing: Column(
@@ -576,25 +632,41 @@ class _DashboardScreenState extends State<DashboardScreen>
                           color: isDark ? Colors.white70 : AppTheme.primary,
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            record.method == AppConstants.methodQR
-                                ? Icons.qr_code_rounded
-                                : Icons.edit_rounded,
-                            size: 12,
-                            color: AppTheme.secondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            record.method,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: AppTheme.secondary,
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isQR
+                              ? AppTheme.secondary.withOpacity(0.12)
+                              : AppTheme.warning.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isQR
+                                  ? Icons.qr_code_rounded
+                                  : Icons.edit_rounded,
+                              size: 10,
+                              color: isQR
+                                  ? AppTheme.secondary
+                                  : AppTheme.warning,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 3),
+                            Text(
+                              record.method,
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: isQR
+                                    ? AppTheme.secondary
+                                    : AppTheme.warning,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -607,6 +679,141 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 }
 
+// ─── Reusable card shell ─────────────────────────────────────────────────────
+class _Card extends StatelessWidget {
+  final bool isDark;
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  const _Card({
+    required this.isDark,
+    required this.child,
+    this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: padding ?? const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.18 : 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+// ─── Compact stat tile (no GridView, no overflow) ────────────────────────────
+class _StatTile extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+  final String? badge;
+
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.25), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '$value',
+                      style: GoogleFonts.poppins(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                        height: 1,
+                      ),
+                    ),
+                    if (badge != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          badge!,
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white54 : const Color(0xFF718096),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Legend dot ──────────────────────────────────────────────────────────────
 class _LegendDot extends StatelessWidget {
   final Color color;
   final String label;
@@ -620,15 +827,15 @@ class _LegendDot extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 10,
-          height: 10,
+          width: 9,
+          height: 9,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 5),
         Text(
           label,
           style: GoogleFonts.inter(
-            fontSize: 11,
+            fontSize: 10,
             color: isDark ? Colors.white54 : const Color(0xFF718096),
           ),
         ),
