@@ -216,19 +216,28 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
+  late List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      HomeScreen(onTabChange: _switchTab),
+      const CheckinScreen(),
+      const DashboardScreen(),
+      const LogsScreen(),
+    ];
+  }
+
+  void _switchTab(int index) {
+    setState(() => _currentIndex = index);
+  }
 
   final List<_TabItem> _tabs = [
-    _TabItem(icon: Icons.home_rounded, label: 'Home', route: AppConstants.routeHome),
-    _TabItem(icon: Icons.qr_code_scanner_rounded, label: 'Check-in', route: AppConstants.routeCheckin),
-    _TabItem(icon: Icons.bar_chart_rounded, label: 'Dashboard', route: AppConstants.routeDashboard),
-    _TabItem(icon: Icons.list_alt_rounded, label: 'Logs', route: AppConstants.routeLogs),
-  ];
-
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    CheckinScreen(),
-    DashboardScreen(),
-    LogsScreen(),
+    _TabItem(icon: Icons.home_rounded, label: 'Home'),
+    _TabItem(icon: Icons.qr_code_scanner_rounded, label: 'Check-in'),
+    _TabItem(icon: Icons.bar_chart_rounded, label: 'Dashboard'),
+    _TabItem(icon: Icons.list_alt_rounded, label: 'Logs'),
   ];
 
   final List<String> _titles = [
@@ -345,7 +354,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: _switchTab,
           items: _tabs
               .map((tab) => BottomNavigationBarItem(
                     icon: Icon(tab.icon),
@@ -361,12 +370,10 @@ class _MainScaffoldState extends State<MainScaffold> {
 class _TabItem {
   final IconData icon;
   final String label;
-  final String route;
 
   const _TabItem({
     required this.icon,
     required this.label,
-    required this.route,
   });
 }
 

@@ -93,7 +93,7 @@ class _StatCardState extends State<StatCard>
     return ScaleTransition(
       scale: _scaleAnimation,
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
@@ -150,17 +150,17 @@ class _StatCardState extends State<StatCard>
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Text(
               '$_displayedValue',
               style: GoogleFonts.poppins(
-                fontSize: 32,
+                fontSize: 26,
                 fontWeight: FontWeight.w700,
                 color: cardColor,
                 height: 1,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               widget.label,
               style: GoogleFonts.inter(

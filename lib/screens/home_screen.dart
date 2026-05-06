@@ -8,7 +8,9 @@ import '../utils/app_theme.dart';
 import '../utils/constants.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final void Function(int tabIndex)? onTabChange;
+
+  const HomeScreen({super.key, this.onTabChange});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -70,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
             const SizedBox(height: 14),
-            _buildNavigationGrid(context),
+            _buildNavigationGrid(context, widget.onTabChange),
             const SizedBox(height: 28),
 
             // Active Event Card
@@ -235,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildNavigationGrid(BuildContext context) {
+  Widget _buildNavigationGrid(BuildContext context, void Function(int)? onTabChange) {
     final cards = [
       _NavCardData(
         icon: Icons.add_circle_outline_rounded,
@@ -243,6 +245,7 @@ class _HomeScreenState extends State<HomeScreen>
         subtitle: 'Set up a new event',
         gradient: [const Color(0xFF0D1B2A), const Color(0xFF1A3A5C)],
         iconColor: AppTheme.secondary,
+        tabIndex: -1, // -1 means use route navigation
         route: AppConstants.routeSetup,
       ),
       _NavCardData(
@@ -251,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen>
         subtitle: 'Scan & verify attendees',
         gradient: [const Color(0xFF006994), AppTheme.secondary],
         iconColor: Colors.white,
-        route: AppConstants.routeCheckin,
+        tabIndex: 1,
       ),
       _NavCardData(
         icon: Icons.bar_chart_rounded,
@@ -259,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen>
         subtitle: 'Live crowd monitoring',
         gradient: [const Color(0xFF1B4332), const Color(0xFF06D6A0)],
         iconColor: Colors.white,
-        route: AppConstants.routeDashboard,
+        tabIndex: 2,
       ),
       _NavCardData(
         icon: Icons.list_alt_rounded,
@@ -267,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen>
         subtitle: 'Search & export records',
         gradient: [const Color(0xFF4A1942), const Color(0xFF8338EC)],
         iconColor: Colors.white,
-        route: AppConstants.routeLogs,
+        tabIndex: 3,
       ),
     ];
 
@@ -279,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen>
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.3,
       children: cards
-          .map((card) => _NavigationCard(data: card))
+          .map((card) => _NavigationCard(data: card, onTabChange: onTabChange))
           .toList(),
     );
   }
@@ -551,7 +554,8 @@ class _NavCardData {
   final String subtitle;
   final List<Color> gradient;
   final Color iconColor;
-  final String route;
+  final int tabIndex;   // -1 = use route, >=0 = switch tab
+  final String? route;
 
   const _NavCardData({
     required this.icon,
@@ -559,14 +563,16 @@ class _NavCardData {
     required this.subtitle,
     required this.gradient,
     required this.iconColor,
-    required this.route,
+    required this.tabIndex,
+    this.route,
   });
 }
 
 class _NavigationCard extends StatefulWidget {
   final _NavCardData data;
+  final void Function(int)? onTabChange;
 
-  const _NavigationCard({required this.data});
+  const _NavigationCard({required this.data, this.onTabChange});
 
   @override
   State<_NavigationCard> createState() => _NavigationCardState();
@@ -610,7 +616,15 @@ class _NavigationCardState extends State<_NavigationCard>
       child: ScaleTransition(
         scale: _hoverAnimation,
         child: GestureDetector(
-          onTap: () => Navigator.pushNamed(context, widget.data.route),
+          onTap: () {
+            if (widget.data.tabIndex >= 0) {
+              // Switch bottom nav tab
+              widget.onTabChange?.call(widget.data.tabIndex);
+            } else {
+              // Push a named route (Create Event)
+              Navigator.pushNamed(context, widget.data.route!);
+            }
+          },
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
