@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     final eventProvider = context.watch<EventProvider>();
     final participantProvider = context.watch<ParticipantProvider>();
-    final connectivityProvider = context.watch<ConnectivityProvider>();
+    context.watch<ConnectivityProvider>();
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
